@@ -196,6 +196,120 @@ export const messageAPI = {
     },
 };
 
+// ==================== FRIEND API ====================
+
+export const friendAPI = {
+    // Gửi lời mời kết bạn
+    sendRequest: async (userId) => {
+        try {
+            const response = await api.post(`/friends/request/${userId}`);
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to send friend request' };
+        }
+    },
+
+    // Chấp nhận lời mời kết bạn
+    acceptRequest: async (userId) => {
+        try {
+            const response = await api.post(`/friends/accept/${userId}`);
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to accept friend request' };
+        }
+    },
+
+    // Từ chối lời mời kết bạn
+    declineRequest: async (userId) => {
+        try {
+            const response = await api.post(`/friends/decline/${userId}`);
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to decline friend request' };
+        }
+    },
+
+    // Hủy lời mời đã gửi
+    cancelRequest: async (userId) => {
+        try {
+            const response = await api.delete(`/friends/request/${userId}`);
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to cancel friend request' };
+        }
+    },
+
+    // Hủy kết bạn (unfriend)
+    unfriend: async (userId) => {
+        try {
+            const response = await api.delete(`/friends/${userId}`);
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to unfriend' };
+        }
+    },
+
+    // Lấy danh sách bạn bè
+    getFriends: async () => {
+        try {
+            const response = await api.get('/friends');
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to get friends list' };
+        }
+    },
+
+    // Lấy lời mời đã nhận
+    getReceivedRequests: async () => {
+        try {
+            const response = await api.get('/friends/requests/received');
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to get received requests' };
+        }
+    },
+
+    // Lấy lời mời đã gửi
+    getSentRequests: async () => {
+        try {
+            const response = await api.get('/friends/requests/sent');
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to get sent requests' };
+        }
+    },
+
+    // Đếm số lời mời chờ
+    getPendingCount: async () => {
+        try {
+            const response = await api.get('/friends/requests/count');
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to get pending count' };
+        }
+    },
+
+    // Kiểm tra trạng thái với 1 user
+    getStatus: async (userId) => {
+        try {
+            const response = await api.get(`/friends/status/${userId}`);
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to get friendship status' };
+        }
+    },
+
+    // Tìm kiếm người dùng
+    searchUsers: async (query) => {
+        try {
+            const response = await api.get(`/friends/search?q=${encodeURIComponent(query)}`);
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to search users' };
+        }
+    }
+};
+
 // ==================== HEALTH CHECK ====================
 
 export const checkServerHealth = async () => {

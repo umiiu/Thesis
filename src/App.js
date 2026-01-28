@@ -7,9 +7,11 @@ import Sidebar from './components/Sidebar';
 import ContactList from './components/ContactList';
 import ChatArea from './components/ChatArea';
 import Settings from './components/Settings';
+import FriendRequests from './components/FriendRequests';
+import FindFriends from './components/FindFriends';
 
 import socketService from './services/socket';
-import { userAPI, messageAPI, authAPI } from './services/api';
+import { friendAPI, messageAPI, authAPI } from './services/api';
 import { decryptMessage, getPrivateKey, clearPrivateKey } from './services/crypto';
 
 function App() {
@@ -17,12 +19,13 @@ function App() {
   const [showSignUp, setShowSignUp] = useState(false);
   const [user, setUser] = useState(null);
   const [selectedChat, setSelectedChat] = useState(null);
-  const [contacts, setContacts] = useState([]);
+  const [contacts, setContacts] = useState([]); // Chỉ chứa bạn bè
   const [messages, setMessages] = useState({});
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [loading, setLoading] = useState(true);
-
+  const [currentView, setCurrentView] = useState('messages'); // messages, settings, requests, find
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   /* ======================
      SESSION CHECK
@@ -66,38 +69,50 @@ function App() {
       socketService.connect(userData.id);
       socketService.setUserOnline(userData.id);
 
-      await loadContacts(userData.id);
+      await loadFriends(); // ✅ Chỉ load bạn bè
+      await loadPendingRequestsCount(); // ✅ Load số lời mời
       setupSocketListeners(userData.id);
     } catch (error) {
       console.error('❌ Error initializing app:', error);
     }
   };
 
-  const loadContacts = async (currentUserId) => {
+  // ✅ Load danh sách bạn bè (thay vì tất cả users)
+  const loadFriends = async () => {
     try {
-      const response = await userAPI.getAllUsers();
+      console.log('📥 Loading friends list...');
+      const response = await friendAPI.getFriends();
 
       if (response.success) {
-        const list = response.users
-          .filter(u => u.id !== currentUserId)
-          .map(u => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            avatar: u.avatar || '👤',
-            status: u.status || 'offline',
-            lastSeen: u.lastSeen,
-            publicKey: u.publicKey,
-            preview: '',
-            time: '',
-            unread: false,
-            typing: false
-          }));
+        const list = response.friends.map(f => ({
+          id: f.id,
+          name: f.name,
+          email: f.email,
+          avatar: f.avatar || '👤',
+          status: f.status || 'offline',
+          lastSeen: f.lastSeen,
+          publicKey: f.publicKey,
+          preview: '',
+          time: '',
+          unread: false,
+          typing: false
+        }));
 
         setContacts(list);
+        console.log('✅ Loaded', list.length, 'friends');
       }
     } catch (error) {
-      console.error('❌ Error loading contacts:', error);
+      console.error('❌ Error loading friends:', error);
+    }
+  };
+
+  // ✅ Load số lượng lời mời kết bạn chờ xử lý
+  const loadPendingRequestsCount = async () => {
+    try {
+      const response = await friendAPI.getPendingCount();
+      setPendingRequestsCount(response.count || 0);
+    } catch (error) {
+      console.error('❌ Error loading pending count:', error);
     }
   };
 
@@ -234,18 +249,17 @@ function App() {
   };
 
   /* ======================
-     CHAT - ĐÃ SỬA ĐỂ DECRYPT CẢ 2 CHIỀU
+     CHAT
   ====================== */
   const handleSelectChat = async (contact) => {
     console.log('💬 Opening chat with:', contact.name);
     setSelectedChat(contact);
+    setCurrentView('messages'); // ✅ Chuyển về view messages
 
-    // Mark as read
     setContacts(prev =>
       prev.map(c => (c.id === contact.id ? { ...c, unread: false } : c))
     );
 
-    // Check if user exists
     if (!user || !user.id) {
       console.warn('⚠️ User not loaded yet');
       return;
@@ -260,7 +274,6 @@ function App() {
 
         if (!privateKey) {
           console.warn('⚠️ Cannot decrypt - private key not available');
-          // Show encrypted placeholder
           const encryptedMsgs = response.messages.map(msg => ({
             id: msg._id,
             sender: msg.sender._id,
@@ -278,16 +291,13 @@ function App() {
           return;
         }
 
-        // Decrypt messages
         const decryptedMsgs = await Promise.all(
           response.messages.map(async (msg) => {
             try {
               let decryptedText;
               const isOwnMessage = msg.sender._id === user.id;
 
-              // ✅ DECRYPT CẢ 2 CHIỀU
               if (isOwnMessage) {
-                // TIN NHẮN MÌNH GỬI - dùng selfEncrypted
                 if (msg.selfEncryptedContent && msg.selfIv && msg.selfEncryptedKey) {
                   console.log('🔓 Decrypting own message using selfEncrypted version');
                   decryptedText = await decryptMessage(
@@ -297,7 +307,6 @@ function App() {
                     privateKey
                   );
                 } else {
-                  // Tin nhắn cũ không có selfEncrypted
                   console.warn('⚠️ Own message without selfEncrypted');
                   return {
                     id: msg._id,
@@ -313,7 +322,6 @@ function App() {
                   };
                 }
               } else {
-                // TIN NHẮN NGƯỜI KHÁC GỬI ĐẾN - dùng encryptedContent bình thường
                 console.log('🔓 Decrypting received message');
                 decryptedText = await decryptMessage(
                   msg.encryptedContent,
@@ -391,6 +399,34 @@ function App() {
   };
 
   /* ======================
+     VIEW HANDLERS
+  ====================== */
+  const handleShowFindFriends = () => {
+    setCurrentView('find');
+    setSelectedChat(null);
+  };
+
+  const handleShowFriendRequests = () => {
+    setCurrentView('requests');
+    setSelectedChat(null);
+  };
+
+  const handleShowSettings = () => {
+    setCurrentView('settings');
+    setSelectedChat(null);
+  };
+
+  const handleShowMessages = () => {
+    setCurrentView('messages');
+  };
+
+  // ✅ Callback khi có thay đổi về friends (thêm bạn, chấp nhận lời mời)
+  const handleFriendsUpdate = async () => {
+    await loadFriends();
+    await loadPendingRequestsCount();
+  };
+
+  /* ======================
      RENDER
   ====================== */
   if (loading) {
@@ -426,8 +462,11 @@ function App() {
       <Sidebar
         user={user}
         onLogout={handleLogout}
-        currentView={selectedChat ? 'messages' : 'settings'}
-        onViewChange={(v) => v === 'settings' && setSelectedChat(null)}
+        currentView={currentView}
+        onViewChange={(view) => {
+          if (view === 'settings') handleShowSettings();
+          if (view === 'messages') handleShowMessages();
+        }}
       />
 
       <ContactList
@@ -435,9 +474,13 @@ function App() {
         selectedChat={selectedChat}
         setSelectedChat={handleSelectChat}
         onlineUsers={onlineUsers}
+        onShowFindFriends={handleShowFindFriends}
+        onShowFriendRequests={handleShowFriendRequests}
+        pendingRequestsCount={pendingRequestsCount}
       />
 
-      {selectedChat ? (
+      {/* ✅ MAIN CONTENT AREA */}
+      {currentView === 'messages' && selectedChat ? (
         <ChatArea
           selectedChat={selectedChat}
           messages={messages[selectedChat.id] || []}
@@ -446,8 +489,18 @@ function App() {
           isTyping={typingUsers.has(selectedChat.id)}
           onSendMessage={handleSendMessage}
         />
-      ) : (
+      ) : currentView === 'settings' ? (
         <Settings user={user} />
+      ) : currentView === 'requests' ? (
+        <FriendRequests onUpdate={handleFriendsUpdate} />
+      ) : currentView === 'find' ? (
+        <FindFriends onUpdate={handleFriendsUpdate} />
+      ) : (
+        <div className="empty-state-main">
+          <div style={{ fontSize: '64px', marginBottom: '16px' }}>💬</div>
+          <h2>Chọn một cuộc trò chuyện</h2>
+          <p>Chọn bạn bè từ danh sách bên trái để bắt đầu nhắn tin</p>
+        </div>
       )}
     </div>
   );

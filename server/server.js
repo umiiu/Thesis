@@ -5,7 +5,6 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const connectDB = require('./config/db');
-// const uploadRoutes = require('./routes/upload'); // ❌ XÓA DÒNG NÀY
 
 // Initialize Express
 const app = express();
@@ -53,7 +52,8 @@ app.get('/', (req, res) => {
       health: '/api/health',
       auth: '/api/auth',
       messages: '/api/messages',
-      users: '/api/users'
+      users: '/api/users',
+      friends: '/api/friends'  // ✅ THÊM ENDPOINT MỚI
     }
   });
 });
@@ -91,6 +91,15 @@ try {
   console.log('✅ User routes loaded');
 } catch (error) {
   console.error('❌ Error loading user routes:', error.message);
+}
+
+// ✅ THÊM FRIEND ROUTES
+try {
+  const friendRoutes = require('./routes/friends');
+  app.use('/api/friends', friendRoutes);
+  console.log('✅ Friend routes loaded');
+} catch (error) {
+  console.error('❌ Error loading friend routes:', error.message);
 }
 
 // ==================== WEBSOCKET MANAGEMENT ====================
@@ -392,6 +401,7 @@ server.listen(PORT, () => {
 ║     🔧 API: http://localhost:${PORT}          ║
 ║     🔌 WebSocket: Enabled                 ║
 ║     🔐 E2EE: Ready (Self-Encryption)      ║
+║     👥 Friends: Enabled                   ║
 ║                                           ║
 ╚═══════════════════════════════════════════╝
     `);
@@ -401,5 +411,8 @@ server.listen(PORT, () => {
   console.log('   POST /api/auth/register');
   console.log('   POST /api/auth/login');
   console.log('   GET  /api/users');
-  console.log('   GET  /api/messages/conversation/:id1/:id2\n');
+  console.log('   GET  /api/messages/conversation/:id1/:id2');
+  console.log('   POST /api/friends/request/:userId');
+  console.log('   GET  /api/friends');
+  console.log('   GET  /api/friends/requests/received\n');
 });
