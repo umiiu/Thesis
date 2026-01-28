@@ -24,6 +24,11 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // ✅ THÊM: Encrypted private key (mã hóa bằng password)
+  encryptedPrivateKey: {
+    type: String,
+    required: true
+  },
   avatar: {
     type: String,
     default: '👤'
@@ -69,7 +74,7 @@ UserSchema.methods.comparePassword = async function (candidatePassword) {
   }
 };
 
-// Get public profile
+// Get public profile (KHÔNG trả về encryptedPrivateKey)
 UserSchema.methods.toPublicJSON = function () {
   return {
     id: this._id,
@@ -83,10 +88,26 @@ UserSchema.methods.toPublicJSON = function () {
   };
 };
 
+// ✅ THÊM: Method để lấy data khi login (có encryptedPrivateKey)
+UserSchema.methods.toAuthJSON = function () {
+  return {
+    id: this._id,
+    email: this.email,
+    name: this.name,
+    publicKey: this.publicKey,
+    encryptedPrivateKey: this.encryptedPrivateKey, // ✅ Trả về khi login
+    avatar: this.avatar,
+    status: this.status,
+    lastSeen: this.lastSeen,
+    createdAt: this.createdAt
+  };
+};
+
 // Remove password from JSON
 UserSchema.methods.toJSON = function () {
   const user = this.toObject();
   delete user.password;
+  delete user.encryptedPrivateKey; // ✅ Không expose trong toJSON mặc định
   return user;
 };
 

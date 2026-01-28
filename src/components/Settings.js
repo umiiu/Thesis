@@ -1,25 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Download, Upload, AlertTriangle, CheckCircle, XCircle, Info, Key } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Download, AlertTriangle, CheckCircle, XCircle, Info, Key } from 'lucide-react';
 import './Settings.css';
-import { getPrivateKey, storePrivateKey, clearPrivateKey } from '../services/crypto';
-
-/* ===============================
-   Helper: fingerprint private key
-================================ */
-async function fingerprintKey(pem) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(pem);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hash))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-}
+import { getPrivateKey, exportPrivateKeyForBackup } from '../services/crypto';
 
 function Settings({ user }) {
     const [hasPrivateKey, setHasPrivateKey] = useState(false);
     const [exporting, setExporting] = useState(false);
-    const [importing, setImporting] = useState(false);
-    const fileInputRef = useRef(null);
 
     useEffect(() => {
         checkPrivateKey();
@@ -30,28 +16,26 @@ function Settings({ user }) {
         setHasPrivateKey(!!privateKey);
     };
 
-    // Export Private Key
+    // ✅ Export Private Key để backup
     const handleExport = () => {
         try {
             setExporting(true);
-            const privateKey = getPrivateKey();
+            const privateKey = exportPrivateKeyForBackup();
 
             if (!privateKey) {
-                alert('❌ No private key found to export!');
+                alert('❌ No private key available to export!\n\nPlease login again to restore your key.');
                 return;
             }
 
-            // Validate private key before export
+            // Validate private key
             if (!privateKey.includes('-----BEGIN PRIVATE KEY-----') || !privateKey.includes('-----END PRIVATE KEY-----')) {
-                alert('❌ Invalid private key format in storage!\n\nYour private key may be corrupted.');
+                alert('❌ Invalid private key format!\n\nYour private key may be corrupted.');
                 return;
             }
 
             console.log('📤 Exporting private key...');
-            console.log('   Length:', privateKey.length);
-            console.log('   Valid format:', privateKey.startsWith('-----BEGIN') && privateKey.endsWith('-----'));
 
-            // Create file content - SIMPLE FORMAT
+            // Create file content
             const exportDate = new Date().toLocaleString();
             const fileContent = `SecureChat Private Key Backup
 ============================================
@@ -104,168 +88,6 @@ ${privateKey}
         }
     };
 
-    // Import Private Key
-    const handleImport = (event) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        console.log('📥 Importing private key from file:', file.name);
-        setImporting(true);
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const content = e.target?.result;
-
-                console.log('📄 File read successfully, length:', content.length);
-
-                // STEP 1: Find the private key markers
-                const beginMarker = '-----BEGIN PRIVATE KEY-----';
-                const endMarker = '-----END PRIVATE KEY-----';
-
-                // Find the LAST occurrence of each marker (in case file has duplicates)
-                const beginIndex = content.lastIndexOf(beginMarker);
-                const endIndex = content.lastIndexOf(endMarker);
-
-                console.log('🔍 Searching for private key markers...');
-                console.log('   BEGIN marker at position:', beginIndex);
-                console.log('   END marker at position:', endIndex);
-
-                // STEP 2: Validate markers were found
-                if (beginIndex === -1) {
-                    throw new Error('Private key BEGIN marker not found.\n\nMake sure you selected the correct SecureChat backup file.\n\nThe file should contain:\n-----BEGIN PRIVATE KEY-----');
-                }
-
-                if (endIndex === -1) {
-                    throw new Error('Private key END marker not found.\n\nThe backup file may be corrupted or incomplete.\n\nThe file should contain:\n-----END PRIVATE KEY-----');
-                }
-
-                if (endIndex <= beginIndex) {
-                    throw new Error('Invalid private key structure.\n\nThe END marker appears before the BEGIN marker.\n\nThe file may be corrupted.');
-                }
-
-                // STEP 3: Extract the private key
-                const privateKey = content.substring(beginIndex, endIndex + endMarker.length).trim();
-
-                console.log('✂️ Extracted private key:');
-                console.log('   Total length:', privateKey.length);
-                console.log('   Number of lines:', privateKey.split('\n').length);
-                console.log('   First line:', privateKey.split('\n')[0]);
-                console.log('   Last line:', privateKey.split('\n').slice(-1)[0]);
-
-                // STEP 4: Validate extracted key
-                if (privateKey.length < 200) {
-                    throw new Error(`Private key is too short (${privateKey.length} characters).\n\nExpected at least 200 characters.\n\nThe file may be corrupted.`);
-                }
-
-                if (!privateKey.startsWith(beginMarker)) {
-                    console.error('❌ Key does not start with BEGIN marker');
-                    console.error('   Starts with:', privateKey.substring(0, 50));
-                    throw new Error('Extracted private key does not start with BEGIN marker.\n\nThis should not happen. Please try again.');
-                }
-
-                if (!privateKey.endsWith(endMarker)) {
-                    console.error('❌ Key does not end with END marker');
-                    console.error('   Ends with:', privateKey.substring(privateKey.length - 50));
-                    throw new Error('Extracted private key does not end with END marker.\n\nThis should not happen. Please try again.');
-                }
-
-                // STEP 5: Validate base64 content
-                const lines = privateKey.split('\n');
-                if (lines.length < 3) {
-                    throw new Error(`Private key has only ${lines.length} lines.\n\nExpected at least 3 lines (BEGIN marker, base64 data, END marker).\n\nThe file may be corrupted.`);
-                }
-
-                // Get middle lines (excluding first and last which are markers)
-                const base64Content = lines.slice(1, -1).join('');
-
-                // Check if it's valid base64
-                if (!/^[A-Za-z0-9+/=\s]+$/.test(base64Content)) {
-                    throw new Error('Private key contains invalid characters.\n\nExpected base64 encoded data between BEGIN and END markers.\n\nThe file may be corrupted.');
-                }
-
-                if (base64Content.length < 100) {
-                    throw new Error(`Base64 content is too short (${base64Content.length} characters).\n\nThe file may be corrupted.`);
-                }
-
-                console.log('✅ Private key validation passed');
-                console.log('   Base64 content length:', base64Content.length);
-
-                // STEP 6: Store the private key
-                console.log('💾 Storing private key in localStorage...');
-                storePrivateKey(privateKey);
-
-                // STEP 7: Verify storage
-                const storedKey = getPrivateKey();
-                if (!storedKey) {
-                    throw new Error('Failed to store private key in localStorage.\n\nlocalStorage may be full, disabled, or in private browsing mode.');
-                }
-
-                if (storedKey.length !== privateKey.length) {
-                    console.error('❌ Stored key length mismatch!');
-                    console.error('   Original:', privateKey.length);
-                    console.error('   Stored:', storedKey.length);
-                    throw new Error(`Private key storage verification failed.\n\nOriginal: ${privateKey.length} chars\nStored: ${storedKey.length} chars\n\nPlease try again.`);
-                }
-
-                if (storedKey !== privateKey) {
-                    console.error('❌ Stored key content mismatch!');
-                    throw new Error('Private key was stored but content does not match.\n\nPlease try again.');
-                }
-
-                console.log('✅ Private key stored successfully');
-                console.log('✅ Storage verification passed');
-
-                checkPrivateKey();
-
-                alert('✅ Private key imported successfully!\n\n🔄 The page will reload in 2 seconds to decrypt your messages...\n\nPlease wait...');
-
-                // Auto reload page after 2 seconds
-                setTimeout(() => {
-                    console.log('🔄 Reloading page...');
-                    window.location.reload();
-                }, 2000);
-
-            } catch (error) {
-                console.error('❌ Import failed:', error);
-                alert('❌ Failed to import private key:\n\n' + error.message + '\n\nPlease make sure you selected the correct SecureChat backup file.');
-            } finally {
-                setImporting(false);
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                }
-            }
-        };
-
-        reader.onerror = (error) => {
-            console.error('❌ File read error:', error);
-            alert('❌ Failed to read the file.\n\nPlease try again.');
-            setImporting(false);
-        };
-
-        reader.readAsText(file);
-    };
-
-    // Delete Private Key
-    const handleDelete = () => {
-        if (!window.confirm('⚠️ ARE YOU SURE?\n\nDeleting your private key means you will NEVER be able to decrypt your old messages again!\n\nThis action CANNOT be undone.\n\nMake sure you have exported and backed up your key first!\n\nDo you want to continue?')) {
-            return;
-        }
-
-        if (!window.confirm('⚠️ FINAL WARNING!\n\nThis is your last chance to back up your private key.\n\nClick OK to permanently delete your private key.\nClick Cancel to go back.')) {
-            return;
-        }
-
-        try {
-            clearPrivateKey();
-            checkPrivateKey();
-            alert('✅ Private key deleted.\n\nYou can still send new messages, but cannot decrypt old messages anymore.');
-        } catch (error) {
-            console.error('Delete error:', error);
-            alert('❌ Failed to delete private key: ' + error.message);
-        }
-    };
-
     return (
         <div className="settings-container">
             <div className="settings-header">
@@ -281,17 +103,20 @@ ${privateKey}
                         Encryption Key Management
                     </h2>
                     <p>
-                        Your private encryption key is used to decrypt messages sent to you.
-                        Keep it safe and secure. If you lose it, you cannot decrypt your old messages.
+                        Your private encryption key is automatically secured with your password.
+                        You can export it for backup purposes.
                     </p>
 
-                    <div className="warning-box">
-                        <AlertTriangle size={20} color="#f59e0b" />
-                        <p>
-                            <strong>Important:</strong> Your private key is stored only in this browser.
-                            If you clear browser data, switch browsers, or use a different device,
-                            you must import your key backup to read old messages.
-                        </p>
+                    <div className="info-box" style={{ marginBottom: '20px' }}>
+                        <Info size={16} />
+                        <div>
+                            <h4>✅ New Security Model</h4>
+                            <p style={{ margin: '8px 0 0 0', fontSize: '14px' }}>
+                                Your private key is now encrypted with your password and securely stored.
+                                You no longer need to manually export/import keys between devices.
+                                Simply login with your password on any device!
+                            </p>
+                        </div>
                     </div>
 
                     {/* Key Status */}
@@ -306,7 +131,7 @@ ${privateKey}
                             <p>
                                 {hasPrivateKey
                                     ? 'You can decrypt and read encrypted messages'
-                                    : 'You cannot decrypt old messages without your key'
+                                    : 'Please login again to restore your key'
                                 }
                             </p>
                         </div>
@@ -320,48 +145,31 @@ ${privateKey}
                             disabled={!hasPrivateKey || exporting}
                         >
                             <Download size={18} />
-                            {exporting ? 'Exporting...' : 'Export Private Key'}
+                            {exporting ? 'Exporting...' : 'Export Private Key (Backup)'}
                         </button>
+                    </div>
 
-                        <button
-                            className="settings-button secondary"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={importing}
-                        >
-                            <Upload size={18} />
-                            {importing ? 'Importing...' : 'Import Private Key'}
-                        </button>
-
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".txt"
-                            onChange={handleImport}
-                            className="file-input"
-                        />
-
-                        {hasPrivateKey && (
-                            <button
-                                className="settings-button danger"
-                                onClick={handleDelete}
-                            >
-                                <XCircle size={18} />
-                                Delete Private Key
-                            </button>
-                        )}
+                    {/* Warning Box */}
+                    <div className="warning-box">
+                        <AlertTriangle size={20} color="#f59e0b" />
+                        <p>
+                            <strong>Important:</strong> Exporting your private key is optional.
+                            It's recommended only as an extra backup. Your key is already
+                            securely stored and accessible whenever you login with your password.
+                        </p>
                     </div>
 
                     {/* Info Box */}
                     <div className="info-box">
                         <h4>
                             <Info size={16} />
-                            How to use:
+                            How it works:
                         </h4>
                         <ul>
-                            <li><strong>Export:</strong> Download your private key to a secure location (password manager, encrypted USB, etc.)</li>
-                            <li><strong>Import:</strong> Upload your private key backup file to restore access to encrypted messages</li>
-                            <li><strong>Delete:</strong> Remove your private key from this browser (make sure you have a backup first!)</li>
-                            <li><strong>⚠️ Never share your private key with anyone!</strong> It can decrypt all your messages.</li>
+                            <li><strong>Automatic:</strong> Your private key is encrypted with your password when you register</li>
+                            <li><strong>Login anywhere:</strong> Simply login with your password on any device - your key is automatically restored</li>
+                            <li><strong>Export (Optional):</strong> Download your private key as an extra backup for safekeeping</li>
+                            <li><strong>⚠️ Never share:</strong> Your private key can decrypt all your messages - keep it secret!</li>
                         </ul>
                     </div>
                 </div>
@@ -377,6 +185,5 @@ ${privateKey}
         </div>
     );
 }
-
 
 export default Settings;

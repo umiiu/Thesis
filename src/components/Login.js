@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, Loader } from 'lucide-react';
 import './Login.css';
 import { authAPI } from '../services/api';
+import { setupPrivateKey } from '../services/keyManagement';
 
 function Login({ onLogin, onSwitchToSignUp }) {
     const [email, setEmail] = useState('');
@@ -31,17 +32,31 @@ function Login({ onLogin, onSwitchToSignUp }) {
         try {
             console.log('🔐 Attempting login...');
 
-            // Call backend API
+            // ✅ 1. Call backend API để login
             const response = await authAPI.login({ email, password });
 
             if (response.success) {
-                console.log('✅ Login successful:', response.user);
+                console.log('✅ Login successful');
 
-                // Store token and user data in localStorage
+                // ✅ 2. Giải mã private key bằng password
+                try {
+                    await setupPrivateKey(
+                        response.user.encryptedPrivateKey,
+                        password
+                    );
+                    console.log('✅ Private key decrypted and stored in session');
+                } catch (keyError) {
+                    console.error('❌ Failed to decrypt private key:', keyError);
+                    setError('Failed to decrypt encryption key. Please try again.');
+                    setLoading(false);
+                    return;
+                }
+
+                // ✅ 3. Store token and user data
                 localStorage.setItem('token', response.token);
                 localStorage.setItem('user', JSON.stringify(response.user));
 
-                // Call parent callback with user data AND token
+                // ✅ 4. Call parent callback
                 onLogin({ ...response.user, token: response.token });
             }
         } catch (error) {
@@ -129,7 +144,14 @@ function Login({ onLogin, onSwitchToSignUp }) {
                     </div>
 
                     <button type="submit" className="login-button" disabled={loading}>
-                        {loading ? 'Signing In...' : 'Sign In'}
+                        {loading ? (
+                            <>
+                                <Loader size={20} className="spinner" />
+                                Signing In...
+                            </>
+                        ) : (
+                            'Sign In'
+                        )}
                     </button>
 
                     <div className="signup-link">

@@ -12,7 +12,8 @@ import FindFriends from './components/FindFriends';
 
 import socketService from './services/socket';
 import { friendAPI, messageAPI, authAPI } from './services/api';
-import { decryptMessage, getPrivateKey, clearPrivateKey } from './services/crypto';
+import { decryptMessage, clearPrivateKey } from './services/crypto';
+import { getPrivateKey } from './services/keyManagement';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -51,6 +52,13 @@ function App() {
         const userData = JSON.parse(savedUser);
         setUser(userData);
         setIsLoggedIn(true);
+
+        // ⚠️ Warning nếu không có private key (đã reload page)
+        if (!privateKey) {
+          console.warn('⚠️ Private key not in session - user needs to login again');
+          alert('⚠️ Your encryption key is not available.\n\nFor security, private keys are only stored during your login session.\n\nPlease login again to restore your encryption key and decrypt messages.');
+        }
+
         await initializeApp(userData);
       } catch (error) {
         console.error('❌ Error restoring session:', error);

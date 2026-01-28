@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Mail, Lock, User, Check, X, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, User, Check, X, Eye, EyeOff, ArrowRight, Loader } from 'lucide-react';
 import './SignUp.css';
 import { authAPI } from '../services/api';
-import { storePrivateKey } from '../services/crypto';
+import { setupPrivateKey } from '../services/keyManagement';
 
 function SignUp({ onSignUp, onSwitchToLogin }) {
     const [formData, setFormData] = useState({
@@ -67,7 +67,9 @@ function SignUp({ onSignUp, onSwitchToLogin }) {
         }
 
         try {
-            // Call backend API
+            console.log('📝 Attempting registration...');
+
+            // ✅ 1. Call backend API để register
             const response = await authAPI.register({
                 name: formData.fullName,
                 email: formData.email,
@@ -77,20 +79,28 @@ function SignUp({ onSignUp, onSwitchToLogin }) {
             if (response.success) {
                 console.log('✅ Registration successful');
 
-                // Store token and user data
+                // ✅ 2. Giải mã private key bằng password
+                try {
+                    await setupPrivateKey(
+                        response.user.encryptedPrivateKey,
+                        formData.password
+                    );
+                    console.log('✅ Private key decrypted and stored in session');
+                } catch (keyError) {
+                    console.error('❌ Failed to decrypt private key:', keyError);
+                    setError('Failed to setup encryption key. Please try again.');
+                    setLoading(false);
+                    return;
+                }
+
+                // ✅ 3. Store token and user data
                 localStorage.setItem('token', response.token);
                 localStorage.setItem('user', JSON.stringify(response.user));
 
-                // IMPORTANT: Store private key securely
-                if (response.privateKey) {
-                    storePrivateKey(response.privateKey);
-                    console.log('🔐 Private key stored securely');
-                }
+                // ✅ 4. Show success message
+                alert('✅ Registration successful! Your encryption keys have been generated and secured with your password.');
 
-                // Show success message
-                alert('Registration successful! Your encryption keys have been generated. Please keep your account secure.');
-
-                // Call parent callback with user data AND token
+                // ✅ 5. Call parent callback
                 onSignUp({ ...response.user, token: response.token });
             }
         } catch (error) {
@@ -243,8 +253,17 @@ function SignUp({ onSignUp, onSwitchToLogin }) {
                         </div>
 
                         <button type="submit" className="submit-btn" disabled={loading}>
-                            <span>{loading ? 'Creating Account...' : 'Sign Up'}</span>
-                            <ArrowRight size={20} />
+                            {loading ? (
+                                <>
+                                    <Loader size={20} className="spinner" />
+                                    Creating Account...
+                                </>
+                            ) : (
+                                <>
+                                    <span>Sign Up</span>
+                                    <ArrowRight size={20} />
+                                </>
+                            )}
                         </button>
 
                         <div className="divider">

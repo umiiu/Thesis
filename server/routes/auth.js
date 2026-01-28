@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const crypto = require('crypto');
+const { encryptPrivateKey } = require('../utils/encryption');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secure-chat-secret';
 
@@ -25,21 +26,34 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, error: 'All fields required' });
     }
 
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
+    }
+
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(409).json({ success: false, error: 'Email exists' });
     }
 
+    // ✅ 1. Generate RSA key pair
     const { publicKey, privateKey } = generateRSAKeyPair();
+    console.log('🔐 Generated RSA keys');
 
+    // ✅ 2. Encrypt private key với password của user
+    const encryptedPrivateKey = encryptPrivateKey(privateKey, password);
+    console.log('✅ Encrypted private key with user password');
+
+    // ✅ 3. Create user (password sẽ tự động hash bởi pre-save hook)
     const user = new User({
       email: email.toLowerCase(),
       password,
       name: name.trim(),
-      publicKey
+      publicKey,
+      encryptedPrivateKey // ✅ Lưu encrypted version
     });
 
     await user.save();
+    console.log('✅ User created:', user.email);
 
     const token = jwt.sign(
       { userId: user._id, email: user.email },
@@ -47,12 +61,13 @@ router.post('/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // ✅ 4. Trả về encryptedPrivateKey để frontend tự giải mã
     res.status(201).json({
       success: true,
       token,
-      user: user.toPublicJSON(),
-      privateKey, // client giữ privateKey này trong localStorage
+      user: user.toAuthJSON(), // ✅ Có encryptedPrivateKey
     });
+
   } catch (error) {
     console.error('❌ Register error:', error);
     res.status(500).json({ success: false, error: 'Registration failed' });
@@ -88,11 +103,15 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    console.log('✅ User logged in:', user.email);
+
+    // ✅ Trả về encryptedPrivateKey để frontend tự giải mã
     res.json({
       success: true,
       token,
-      user: user.toPublicJSON(),
+      user: user.toAuthJSON(), // ✅ Có encryptedPrivateKey
     });
+
   } catch (error) {
     console.error('❌ Login error:', error);
     res.status(500).json({ success: false, error: 'Login failed' });

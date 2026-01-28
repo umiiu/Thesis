@@ -1,5 +1,18 @@
 // E2EE Encryption Utilities using Web Crypto API
 
+// ✅ IMPORT KEY MANAGEMENT FUNCTIONS
+import {
+    getPrivateKey,
+    storePrivateKey,
+    clearPrivateKey,
+    exportPrivateKeyForBackup
+} from './keyManagement';
+
+// ✅ RE-EXPORT for backward compatibility
+export { getPrivateKey, storePrivateKey, clearPrivateKey, exportPrivateKeyForBackup };
+
+// ==================== HELPER FUNCTIONS ====================
+
 // Convert string to ArrayBuffer
 function str2ab(str) {
     const buf = new ArrayBuffer(str.length);
@@ -258,37 +271,5 @@ export async function decryptMessage(encryptedContent, encryptedKey, ivBase64, p
     } catch (error) {
         console.error('Error decrypting message:', error);
         throw error;
-    }
-}
-
-// ==================== KEY STORAGE ====================
-
-// Store private key securely in localStorage
-export function storePrivateKey(privateKey) {
-    try {
-        localStorage.setItem('privateKey', privateKey);
-        console.log('✅ Private key stored securely');
-    } catch (error) {
-        console.error('Error storing private key:', error);
-    }
-}
-
-// Retrieve private key from localStorage
-export function getPrivateKey() {
-    try {
-        return localStorage.getItem('privateKey');
-    } catch (error) {
-        console.error('Error retrieving private key:', error);
-        return null;
-    }
-}
-
-// Clear private key (on logout)
-export function clearPrivateKey() {
-    try {
-        localStorage.removeItem('privateKey');
-        console.log('✅ Private key cleared');
-    } catch (error) {
-        console.error('Error clearing private key:', error);
     }
 }
