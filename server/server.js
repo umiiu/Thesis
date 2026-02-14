@@ -53,7 +53,8 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       messages: '/api/messages',
       users: '/api/users',
-      friends: '/api/friends'  // ✅ THÊM ENDPOINT MỚI
+      friends: '/api/friends',
+      ai: '/api/ai'  // ✅ AI ENDPOINTS
     }
   });
 });
@@ -93,13 +94,22 @@ try {
   console.error('❌ Error loading user routes:', error.message);
 }
 
-// ✅ THÊM FRIEND ROUTES
+// ✅ FRIEND ROUTES
 try {
   const friendRoutes = require('./routes/friends');
   app.use('/api/friends', friendRoutes);
   console.log('✅ Friend routes loaded');
 } catch (error) {
   console.error('❌ Error loading friend routes:', error.message);
+}
+
+// ✅ AI ROUTES - NEW!
+try {
+  const aiRoutes = require('./routes/ai');
+  app.use('/api/ai', aiRoutes);
+  console.log('✅ AI routes loaded');
+} catch (error) {
+  console.error('❌ Error loading AI routes:', error.message);
 }
 
 // ==================== WEBSOCKET MANAGEMENT ====================
@@ -402,6 +412,7 @@ server.listen(PORT, () => {
 ║     🔌 WebSocket: Enabled                 ║
 ║     🔐 E2EE: Ready (Self-Encryption)      ║
 ║     👥 Friends: Enabled                   ║
+║     🤖 AI Features: Enabled               ║
 ║                                           ║
 ╚═══════════════════════════════════════════╝
     `);
@@ -414,5 +425,8 @@ server.listen(PORT, () => {
   console.log('   GET  /api/messages/conversation/:id1/:id2');
   console.log('   POST /api/friends/request/:userId');
   console.log('   GET  /api/friends');
-  console.log('   GET  /api/friends/requests/received\n');
+  console.log('   GET  /api/friends/requests/received');
+  console.log('   POST /api/ai/smart-reply');
+  console.log('   POST /api/ai/summarize');
+  console.log('   GET  /api/ai/health\n');
 });

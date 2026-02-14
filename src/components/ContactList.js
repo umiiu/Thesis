@@ -10,6 +10,19 @@ function ContactList({
     onShowFriendRequests,
     pendingRequestsCount = 0
 }) {
+    // ✅ FIXED: Render avatar correctly (emoji or base64 image)
+    const renderAvatar = (avatar) => {
+        if (!avatar) return '👤';
+
+        // Check if it's a base64 image
+        if (avatar.startsWith('data:image/')) {
+            return <img src={avatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />;
+        }
+
+        // Otherwise it's an emoji
+        return avatar;
+    };
+
     return (
         <div className="contact-list">
             <div className="contact-list-header">
@@ -71,7 +84,9 @@ function ContactList({
                             onClick={() => setSelectedChat(contact)}
                             className={`contact-item ${selectedChat?.id === contact.id ? 'selected' : ''}`}
                         >
-                            <div className="contact-avatar">{contact.avatar || '👤'}</div>
+                            <div className="contact-avatar">
+                                {renderAvatar(contact.avatar)}
+                            </div>
                             <div className="contact-details">
                                 <div className="contact-top">
                                     <h3 className="contact-name">{contact.name}</h3>

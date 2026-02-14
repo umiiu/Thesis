@@ -150,6 +150,64 @@ export function exportPrivateKeyForBackup() {
     return privateKey;
 }
 
+// ==================== IMPORT KEY (RESTORE FROM BACKUP) ====================
+// Import private key từ backup file
+
+export function importPrivateKeyFromBackup(privateKeyPEM) {
+    try {
+        // Validate private key format
+        if (!privateKeyPEM || typeof privateKeyPEM !== 'string') {
+            throw new Error('Invalid private key format');
+        }
+
+        // Check if it's a valid PEM format
+        if (!privateKeyPEM.includes('-----BEGIN PRIVATE KEY-----') ||
+            !privateKeyPEM.includes('-----END PRIVATE KEY-----')) {
+            throw new Error('Invalid PEM format - missing headers/footers');
+        }
+
+        // Clean up the key (remove extra whitespace)
+        const cleanedKey = privateKeyPEM.trim();
+
+        // Store in sessionStorage
+        storePrivateKeyInSession(cleanedKey);
+
+        console.log('✅ Private key imported successfully');
+        return true;
+
+    } catch (error) {
+        console.error('❌ Failed to import private key:', error);
+        throw error;
+    }
+}
+
+// ==================== PARSE BACKUP FILE ====================
+// Parse backup file và extract private key
+
+export function parseBackupFile(fileContent) {
+    try {
+        // Tìm vị trí bắt đầu và kết thúc của private key
+        const startMarker = '-----BEGIN PRIVATE KEY-----';
+        const endMarker = '-----END PRIVATE KEY-----';
+
+        const startIndex = fileContent.indexOf(startMarker);
+        const endIndex = fileContent.indexOf(endMarker);
+
+        if (startIndex === -1 || endIndex === -1) {
+            throw new Error('Private key not found in backup file');
+        }
+
+        // Extract private key (bao gồm cả header/footer)
+        const privateKey = fileContent.substring(startIndex, endIndex + endMarker.length).trim();
+
+        return privateKey;
+
+    } catch (error) {
+        console.error('❌ Failed to parse backup file:', error);
+        throw error;
+    }
+}
+
 // ==================== COMPATIBILITY WITH OLD CRYPTO.JS ====================
 // Để giữ backward compatibility với code cũ
 

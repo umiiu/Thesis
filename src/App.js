@@ -32,7 +32,9 @@ function App() {
      SESSION CHECK
   ====================== */
   useEffect(() => {
+
     checkExistingSession();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -498,7 +500,8 @@ function App() {
           onSendMessage={handleSendMessage}
         />
       ) : currentView === 'settings' ? (
-        <Settings user={user} />
+        <Settings user={user}
+          onUserUpdate={(updatedUser) => setUser(updatedUser)} />
       ) : currentView === 'requests' ? (
         <FriendRequests onUpdate={handleFriendsUpdate} />
       ) : currentView === 'find' ? (

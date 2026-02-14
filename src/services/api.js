@@ -128,6 +128,16 @@ export const userAPI = {
             throw error.response?.data || { error: 'Failed to update status' };
         }
     },
+
+    // ✅ NEW: Update avatar
+    updateAvatar: async (avatarBase64) => {
+        try {
+            const response = await api.put('/users/avatar', { avatar: avatarBase64 });
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to update avatar' };
+        }
+    },
 };
 
 // ==================== MESSAGE API ====================
@@ -306,6 +316,46 @@ export const friendAPI = {
             return response.data;
         } catch (error) {
             throw error.response?.data || { error: 'Failed to search users' };
+        }
+    }
+};
+
+// ==================== AI API ====================
+
+export const aiAPI = {
+    // Generate smart reply suggestions
+    generateSmartReplies: async (message, conversationContext = []) => {
+        try {
+            const response = await api.post('/ai/smart-reply', {
+                message,
+                conversationContext
+            });
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to generate smart replies' };
+        }
+    },
+
+    // Summarize conversation
+    summarizeConversation: async (messages, options = {}) => {
+        try {
+            const response = await api.post('/ai/summarize', {
+                messages,
+                options
+            });
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to summarize conversation' };
+        }
+    },
+
+    // Test AI connection
+    testConnection: async () => {
+        try {
+            const response = await api.get('/ai/health');
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to test AI connection' };
         }
     }
 };

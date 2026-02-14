@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Download, AlertTriangle, CheckCircle, XCircle, Info, Key } from 'lucide-react';
 import './Settings.css';
-import { getPrivateKey, exportPrivateKeyForBackup } from '../services/crypto';
+import { getPrivateKey, exportPrivateKeyForBackup } from '../services/keyManagement';
+import AvatarUpload from './AvatarUpload';
+import { userAPI } from '../services/api';
 
-function Settings({ user }) {
+function Settings({ user, onUserUpdate }) {
     const [hasPrivateKey, setHasPrivateKey] = useState(false);
     const [exporting, setExporting] = useState(false);
 
@@ -16,7 +18,31 @@ function Settings({ user }) {
         setHasPrivateKey(!!privateKey);
     };
 
-    // ✅ Export Private Key để backup
+    // ✅ Handle avatar change
+    const handleAvatarChange = async (newAvatarBase64) => {
+        try {
+            const response = await userAPI.updateAvatar(newAvatarBase64);
+
+            if (response.success) {
+                // Update user in parent component
+                if (onUserUpdate) {
+                    onUserUpdate({ ...user, avatar: response.avatar });
+                }
+
+                // Also update localStorage
+                const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                savedUser.avatar = response.avatar;
+                localStorage.setItem('user', JSON.stringify(savedUser));
+
+                alert('✅ Đã cập nhật ảnh đại diện!');
+            }
+        } catch (error) {
+            console.error('❌ Failed to update avatar:', error);
+            alert('❌ Lỗi: ' + (error.error || 'Không thể cập nhật ảnh đại diện'));
+        }
+    };
+
+    // Export Private Key để backup
     const handleExport = () => {
         try {
             setExporting(true);
@@ -27,7 +53,6 @@ function Settings({ user }) {
                 return;
             }
 
-            // Validate private key
             if (!privateKey.includes('-----BEGIN PRIVATE KEY-----') || !privateKey.includes('-----END PRIVATE KEY-----')) {
                 alert('❌ Invalid private key format!\n\nYour private key may be corrupted.');
                 return;
@@ -35,7 +60,6 @@ function Settings({ user }) {
 
             console.log('📤 Exporting private key...');
 
-            // Create file content
             const exportDate = new Date().toLocaleString();
             const fileContent = `SecureChat Private Key Backup
 ============================================
@@ -60,13 +84,11 @@ Export Date: ${exportDate}
 ${privateKey}
 `;
 
-            // Create blob and download
             const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
 
-            // Create filename with timestamp
             const timestamp = Date.now();
             const safeEmail = (user?.email || 'backup').replace(/[^a-z0-9]/gi, '-');
             link.download = `securechat-privatekey-${safeEmail}-${timestamp}.txt`;
@@ -96,6 +118,12 @@ ${privateKey}
             </div>
 
             <div className="settings-content">
+                {/* ✅ NEW: Avatar Upload Section */}
+                <AvatarUpload
+                    currentAvatar={user?.avatar}
+                    onAvatarChange={handleAvatarChange}
+                />
+
                 {/* Encryption Key Management */}
                 <div className="settings-section">
                     <h2>

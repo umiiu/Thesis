@@ -9,6 +9,19 @@ function Sidebar({ user, onLogout, currentView, onViewChange }) {
         }
     };
 
+    // ✅ FIXED: Render avatar correctly (emoji or base64 image)
+    const renderAvatar = () => {
+        const avatar = user?.avatar || '👤';
+
+        // Check if it's a base64 image
+        if (avatar.startsWith('data:image/')) {
+            return <img src={avatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />;
+        }
+
+        // Otherwise it's an emoji
+        return avatar;
+    };
+
     return (
         <div className="sidebar">
             {/* ===== Header ===== */}
@@ -57,7 +70,7 @@ function Sidebar({ user, onLogout, currentView, onViewChange }) {
             <div className="sidebar-footer">
                 <div className="user-profile">
                     <div className="user-avatar">
-                        {user?.avatar || '👤'}
+                        {renderAvatar()}
                     </div>
 
                     <div className="user-info">

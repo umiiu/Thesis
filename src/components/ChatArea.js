@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, MoreVertical, Paperclip, Smile, Image } from 'lucide-react';
+import { Send, Paperclip, Smile, Image } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import './ChatArea.css';
 import socketService from '../services/socket';
 import { encryptMessage } from '../services/crypto';
+import SmartReply from './SmartReply';
 
 function ChatArea({ selectedChat, messages, currentUser, onlineUsers, isTyping, onSendMessage }) {
     const [messageInput, setMessageInput] = useState('');
@@ -117,18 +118,50 @@ function ChatArea({ selectedChat, messages, currentUser, onlineUsers, isTyping, 
         }
     };
 
+    // ✅ Handle smart reply selection
+    const handleSmartReplySelect = (reply) => {
+        setMessageInput(reply);
+        textareaRef.current?.focus();
+    };
+
+    // ✅ FIXED: Render avatar correctly (emoji or base64 image)
+    const renderAvatar = (avatar) => {
+        if (!avatar) return '👤';
+
+        // Check if it's a base64 image
+        if (avatar.startsWith('data:image/')) {
+            return <img src={avatar} alt="Avatar" style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                objectFit: 'cover'
+            }} />;
+        }
+
+        // Otherwise it's an emoji
+        return avatar;
+    };
+
     if (!selectedChat) {
         return <div className="chat-area empty">Select a chat</div>;
     }
 
     const isOnline = onlineUsers?.has(selectedChat.id);
 
+    // Get conversation context for AI (last 5 messages)
+    const conversationContext = messages.slice(-5).map(msg => ({
+        text: msg.text,
+        isOwn: msg.isOwn
+    }));
+
     return (
         <div className="chat-area">
             {/* Header */}
             <div className="chat-header">
                 <div className="chat-user-info">
-                    <div className="chat-avatar">{selectedChat.avatar}</div>
+                    <div className="chat-avatar">
+                        {renderAvatar(selectedChat.avatar)}
+                    </div>
                     <div>
                         <h3 className="chat-username">{selectedChat.name}</h3>
                         <div className="chat-status">
@@ -147,7 +180,11 @@ function ChatArea({ selectedChat, messages, currentUser, onlineUsers, isTyping, 
                 {messages.map((message, index) => (
                     <div key={message.id || index} className={`message-row ${message.isOwn ? 'own' : 'other'}`}>
                         <div className="message-content">
-                            {!message.isOwn && <div className="msg-avatar">{selectedChat.avatar}</div>}
+                            {!message.isOwn && (
+                                <div className="msg-avatar">
+                                    {renderAvatar(selectedChat.avatar)}
+                                </div>
+                            )}
                             <div>
                                 <div className={`message-bubble ${message.isOwn ? 'own' : 'other'}`}>
                                     <p>{message.text}</p>
@@ -168,6 +205,15 @@ function ChatArea({ selectedChat, messages, currentUser, onlineUsers, isTyping, 
 
                 <div ref={messagesEndRef} />
             </div>
+
+            {/* ✅ Smart Reply Component */}
+            {messages.length > 0 && (
+                <SmartReply
+                    lastMessage={messages[messages.length - 1]}
+                    conversationContext={conversationContext}
+                    onSelectReply={handleSmartReplySelect}
+                />
+            )}
 
             {/* Input */}
             <div className="input-area">

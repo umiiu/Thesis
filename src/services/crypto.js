@@ -5,11 +5,20 @@ import {
     getPrivateKey,
     storePrivateKey,
     clearPrivateKey,
-    exportPrivateKeyForBackup
+    exportPrivateKeyForBackup,
+    importPrivateKeyFromBackup,
+    parseBackupFile
 } from './keyManagement';
 
 // ✅ RE-EXPORT for backward compatibility
-export { getPrivateKey, storePrivateKey, clearPrivateKey, exportPrivateKeyForBackup };
+export {
+    getPrivateKey,
+    storePrivateKey,
+    clearPrivateKey,
+    exportPrivateKeyForBackup,
+    importPrivateKeyFromBackup,
+    parseBackupFile
+};
 
 // ==================== HELPER FUNCTIONS ====================
 

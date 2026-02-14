@@ -182,12 +182,16 @@
 
 .settings-button.secondary {
   background: white;
-  color: #2563eb;
-  border: 2px solid #2563eb;
+  color: #10b981;
+  border: 2px solid #10b981;
 }
 
 .settings-button.secondary:hover:not(:disabled) {
-  background: #eff6ff;
+  background: #d1fae5;
+  border-color: #059669;
+  color: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .settings-button.danger {
@@ -231,4 +235,11 @@
 
 .info-box li {
   margin-bottom: 4px;
+}
+
+.info-box p {
+  margin: 0;
+  color: #1e40af;
+  font-size: 13px;
+  line-height: 1.6;
 }

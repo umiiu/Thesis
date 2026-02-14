@@ -13,7 +13,17 @@ const MessageSchema = new mongoose.Schema({
         required: true,
         index: true
     },
+    // ✅ NEW: Message type
+    type: {
+        type: String,
+        enum: ['text', 'image', 'file'],
+        default: 'text',
+        index: true
+    },
     // Encrypted message content (for RECIPIENT)
+    // For text: encrypted text
+    // For image: encrypted base64 image data
+    // For file: encrypted base64 file data
     encryptedContent: {
         type: String,
         required: true
@@ -40,6 +50,18 @@ const MessageSchema = new mongoose.Schema({
     selfEncryptedKey: {
         type: String,
         required: false
+    },
+    // ✅ NEW: Metadata for images and files
+    metadata: {
+        // For images
+        originalName: String,
+        mimeType: String,
+        size: Number,        // bytes
+        width: Number,       // pixels
+        height: Number,      // pixels
+
+        // For files
+        fileName: String
     },
     // Message status
     status: {
@@ -78,6 +100,7 @@ MessageSchema.index({ sender: 1, recipient: 1, timestamp: -1 });
 MessageSchema.index({ recipient: 1, status: 1 });
 MessageSchema.index({ sender: 1, timestamp: -1 });
 MessageSchema.index({ recipient: 1, timestamp: -1 });
+MessageSchema.index({ type: 1, timestamp: -1 });
 
 // Static method: Get conversation between two users
 MessageSchema.statics.getConversation = async function (userId1, userId2, limit = 50, skip = 0) {

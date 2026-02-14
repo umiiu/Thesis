@@ -86,11 +86,10 @@
   padding: 0 6px;
 }
 .message-info.own {
-  justify-content: flex-end;   /* ĐẨY QUA PHẢI */
+  justify-content: flex-end;
   text-align: right;
 }
 
-/* Tin người khác */
 .message-info.other {
   justify-content: flex-start;
   text-align: left;
@@ -152,4 +151,51 @@
   bottom: 60px;
   right: 16px;
   z-index: 1000;
+}
+
+/* ===== AI FEATURE STYLES - NEW! ===== */
+
+/* AI Feature Buttons in Header */
+.chat-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: #f3f4f6;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.action-btn:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: #374151;
+  transform: translateY(-1px);
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Special styling for AI feature buttons */
+.action-btn[title="Summarize Conversation"] {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.action-btn[title="Summarize Conversation"]:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  border-color: #0ea5e9;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
 }
