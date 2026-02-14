@@ -207,9 +207,9 @@ function ChatArea({ selectedChat, messages, currentUser, onlineUsers, isTyping, 
             </div>
 
             {/* ✅ Smart Reply Component */}
-            {messages.length > 0 && (
+            {messages.length > 0 && !messages[messages.length - 1].isOwn && (
                 <SmartReply
-                    lastMessage={messages[messages.length - 1]}
+                    lastReceivedMessage={messages[messages.length - 1].text}
                     conversationContext={conversationContext}
                     onSelectReply={handleSmartReplySelect}
                 />
