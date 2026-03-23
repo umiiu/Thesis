@@ -1,0 +1,165 @@
+/* =========================
+   SIDEBAR ROOT
+========================= */
+.sidebar {
+  width: 256px;
+  height: 100vh;
+
+  background-color: #ffffff;
+  border-right: 1px solid #e5e7eb;
+
+  display: flex;
+  flex-direction: column;
+}
+
+/* =========================
+   HEADER
+========================= */
+.sidebar-header {
+  padding: 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+
+  background-color: #2563eb;
+  color: #ffffff;
+
+  border-radius: 8px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-text {
+  font-weight: 700;
+  font-size: 18px;
+  color: #111827;
+}
+
+/* Menu button */
+.menu-btn {
+  padding: 8px;
+
+  border: none;
+  background: transparent;
+  cursor: pointer;
+
+  border-radius: 8px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #6b7280;
+}
+
+.menu-btn:hover {
+  background-color: #f3f4f6;
+}
+
+/* =========================
+   NAVIGATION
+========================= */
+.sidebar-nav {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.nav-item {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 10px 12px;
+  margin-bottom: 4px;
+
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+
+  cursor: pointer;
+
+  color: #374151;
+  font-size: 14px;
+  text-align: left;
+
+  transition: background-color 0.2s ease;
+}
+
+.nav-item:hover {
+  background-color: #f3f4f6;
+}
+
+.nav-item.active {
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.nav-icon {
+  font-size: 16px;
+}
+
+/* =========================
+   FOOTER / USER INFO
+========================= */
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px;
+
+  border-top: 1px solid #e5e7eb;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+
+  background-color: #d1d5db;
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.user-role {
+  font-size: 12px;
+  color: #6b7280;
+}
