@@ -1,10 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Paperclip, Smile, Image, Sparkles } from 'lucide-react';
+import { Send, Smile, Sparkles } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import './ChatArea.css';
 import socketService from '../services/socket';
 import { encryptMessage } from '../services/crypto';
 import AIPanel from './AIPanel';
+
+// Helper render avatar an toàn
+const SafeAvatar = ({ avatar, size = 40 }) => {
+    const isImage = avatar && avatar.startsWith('data:image/');
+    const isEmoji = avatar && avatar.length <= 10;
+    return (
+        <div style={{
+            width: size, height: size, borderRadius: '50%',
+            background: '#e5e7eb', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            fontSize: size * 0.5, overflow: 'hidden', flexShrink: 0
+        }}>
+            {isImage
+                ? <img src={avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : isEmoji ? avatar : '👤'}
+        </div>
+    );
+};
 
 function ChatArea({ selectedChat, messages, currentUser, onlineUsers, isTyping, onSendMessage }) {
     const [messageInput, setMessageInput] = useState('');
@@ -75,10 +93,7 @@ function ChatArea({ selectedChat, messages, currentUser, onlineUsers, isTyping, 
             };
 
             socketService.sendMessage(messageData);
-
-            if (onSendMessage) {
-                onSendMessage({ ...messageData, originalText });
-            }
+            if (onSendMessage) onSendMessage({ ...messageData, originalText });
         } catch (error) {
             console.error('❌ Error sending message:', error);
             alert('Failed to send message. Please try again.');
@@ -113,7 +128,8 @@ function ChatArea({ selectedChat, messages, currentUser, onlineUsers, isTyping, 
                 {/* Header */}
                 <div className="chat-header">
                     <div className="chat-user-info">
-                        <div className="chat-avatar">{selectedChat.avatar}</div>
+                        {/* ✅ SafeAvatar thay vì render thẳng */}
+                        <SafeAvatar avatar={selectedChat.avatar} size={40} />
                         <div>
                             <h3 className="chat-username">{selectedChat.name}</h3>
                             <div className="chat-status">
@@ -138,7 +154,8 @@ function ChatArea({ selectedChat, messages, currentUser, onlineUsers, isTyping, 
                     {messages.map((message, index) => (
                         <div key={message.id || index} className={`message-row ${message.isOwn ? 'own' : 'other'}`}>
                             <div className="message-content">
-                                {!message.isOwn && <div className="msg-avatar">{selectedChat.avatar}</div>}
+                                {/* ✅ SafeAvatar cho message avatar */}
+                                {!message.isOwn && <SafeAvatar avatar={selectedChat.avatar} size={32} />}
                                 <div>
                                     <div className={`message-bubble ${message.isOwn ? 'own' : 'other'}`}>
                                         <p>{message.text}</p>
@@ -175,8 +192,7 @@ function ChatArea({ selectedChat, messages, currentUser, onlineUsers, isTyping, 
                             <button className="input-btn" onClick={() => setShowEmoji(v => !v)} disabled={sending}>
                                 <Smile size={16} />
                             </button>
-                            <button className="input-btn" disabled><Paperclip size={16} /></button>
-                            <button className="input-btn" disabled><Image size={16} /></button>
+
                         </div>
 
                         {showEmoji && (

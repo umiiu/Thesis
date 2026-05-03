@@ -101,6 +101,15 @@ export const userAPI = {
             throw error.response?.data || { error: 'Failed to update status' };
         }
     },
+
+    updateAvatar: async (avatar) => {
+        try {
+            const response = await api.put('/users/avatar', { avatar });
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to update avatar' };
+        }
+    },
 };
 
 // ==================== MESSAGE API ====================

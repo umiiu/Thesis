@@ -23,8 +23,9 @@ function AIPanel({ messages, onSelectReply, onClose }) {
         try {
             const replies = await generateSmartReplies(decryptedMessages);
             setSmartReplies(replies);
-        } catch {
-            setError('Ollama is not running. Start Ollama and try again.');
+        } catch (err) {
+            setError('Failed to generate suggestions. Please try again.');
+            console.error('Smart reply error:', err);
         } finally {
             setLoading(false);
         }
@@ -41,8 +42,9 @@ function AIPanel({ messages, onSelectReply, onClose }) {
         try {
             const result = await summarizeConversation(decryptedMessages);
             setSummary(result);
-        } catch {
-            setError('Ollama is not running. Start Ollama and try again.');
+        } catch (err) {
+            setError('Failed to generate summary. Please try again.');
+            console.error('Summarize error:', err);
         } finally {
             setLoading(false);
         }
@@ -54,7 +56,7 @@ function AIPanel({ messages, onSelectReply, onClose }) {
                 <div className="ai-panel-title">
                     <Sparkles size={16} />
                     <span>AI Assistant</span>
-                    <span className="ai-badge">Ollama</span>
+                    <span className="ai-badge">Gemini</span>
                 </div>
                 <button className="ai-close-btn" onClick={onClose}>
                     <X size={16} />
