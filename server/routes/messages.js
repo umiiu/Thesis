@@ -3,9 +3,7 @@ const router = express.Router();
 const Message = require('../models/Message');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// @route   GET /api/messages/conversation/:userId1/:userId2
-// @desc    Get conversation between two users
-// @access  Private
+// GET /api/messages/conversation/:userId1/:userId2
 router.get('/conversation/:userId1/:userId2', authMiddleware, async (req, res) => {
     try {
         const { userId1, userId2 } = req.params;
@@ -19,41 +17,46 @@ router.get('/conversation/:userId1/:userId2', authMiddleware, async (req, res) =
             count: messages.length,
             messages: messages.reverse()
         });
-
     } catch (error) {
         console.error('❌ Error fetching conversation:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to load conversation'
-        });
+        res.status(500).json({ success: false, error: 'Failed to load conversation' });
     }
 });
 
-// @route   GET /api/messages/unread/:userId
-// @desc    Get unread message count
-// @access  Private
+// GET /api/messages/unread/:userId
+// Trả về tổng unread của current user
 router.get('/unread/:userId', authMiddleware, async (req, res) => {
     try {
         const { userId } = req.params;
         const unreadCount = await Message.getUnreadCount(userId);
-
-        res.json({
-            success: true,
-            unreadCount
-        });
-
+        res.json({ success: true, unreadCount });
     } catch (error) {
         console.error('❌ Error fetching unread count:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to get unread count'
-        });
+        res.status(500).json({ success: false, error: 'Failed to get unread count' });
     }
 });
 
-// @route   POST /api/messages
-// @desc    Send a message (REST API alternative to WebSocket)
-// @access  Private
+// ✅ GET /api/messages/unread-from/:senderId
+// Trả về số tin chưa đọc từ một sender cụ thể gửi đến current user
+router.get('/unread-from/:senderId', authMiddleware, async (req, res) => {
+    try {
+        const recipientId = req.userId; // current user
+        const { senderId } = req.params;
+
+        const count = await Message.countDocuments({
+            sender: senderId,
+            recipient: recipientId,
+            status: { $ne: 'read' }
+        });
+
+        res.json({ success: true, unreadCount: count });
+    } catch (error) {
+        console.error('❌ Error fetching unread from sender:', error);
+        res.status(500).json({ success: false, error: 'Failed to get unread count' });
+    }
+});
+
+// POST /api/messages
 router.post('/', authMiddleware, async (req, res) => {
     try {
         const senderId = req.userId;
@@ -62,17 +65,13 @@ router.post('/', authMiddleware, async (req, res) => {
             encryptedContent,
             iv,
             encryptedKey,
-            // Self-encrypted fields (for sender to read later)
             selfEncryptedContent,
             selfIv,
             selfEncryptedKey
         } = req.body;
 
         if (!recipientId || !encryptedContent || !iv || !encryptedKey) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields'
-            });
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
         }
 
         const message = new Message({
@@ -81,7 +80,6 @@ router.post('/', authMiddleware, async (req, res) => {
             encryptedContent,
             iv,
             encryptedKey,
-            // Save self-encrypted version (optional)
             selfEncryptedContent: selfEncryptedContent || null,
             selfIv: selfIv || null,
             selfEncryptedKey: selfEncryptedKey || null
@@ -93,17 +91,10 @@ router.post('/', authMiddleware, async (req, res) => {
             .populate('sender', 'name avatar')
             .populate('recipient', 'name avatar');
 
-        res.status(201).json({
-            success: true,
-            message: populatedMessage
-        });
-
+        res.status(201).json({ success: true, message: populatedMessage });
     } catch (error) {
         console.error('❌ Error sending message:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to send message'
-        });
+        res.status(500).json({ success: false, error: 'Failed to send message' });
     }
 });
 

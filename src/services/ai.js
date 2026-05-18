@@ -44,31 +44,42 @@ export async function generateSmartReplies(messages) {
 
     const lang = detectLanguage(messages);
 
-    const prompt = 'You are a chat assistant for a messaging app.\n\n'
+    const prompt = 'You are a chat assistant. Based on this conversation, generate exactly 3 short reply suggestions for "Me".\n\n'
         + 'Conversation:\n'
         + recentMessages
-        + '\n\nTask: Generate EXACTLY 3 short reply suggestions for "Me".\n\n'
-        + 'Requirements:\n'
-        + '- Write EXACTLY 3 replies, each on its own line\n'
-        + '- Use ' + lang + ' language ONLY\n'
-        + '- Each reply must be under 12 words\n'
-        + '- No numbers, no bullets, no dashes, no labels\n'
-        + '- Sound casual and natural like a real person texting\n'
-        + '- Each reply should be different in tone or content\n\n'
-        + 'Output 3 lines only, nothing else:';
+        + '\n\nRules:\n'
+        + '- Output ONLY 3 lines, one reply per line\n'
+        + '- Use ' + lang + ' language\n'
+        + '- Each reply must be under 15 words\n'
+        + '- No numbering, no bullets, no extra text\n'
+        + '- Make each reply different in tone\n\n'
+        + 'Reply 1:\nReply 2:\nReply 3:';
 
-    const raw = await callGemini(prompt, 300);
+    const raw = await callGemini(prompt, 150);  // ← tăng lên 150
 
-    const suggestions = raw
-        .split('\n')
-        .map(function (l) { return l.replace(/^[\d.\-*\[\]\s]+/, '').trim(); })
-        .filter(function (l) { return l.length > 0 && l.length < 100; })
-        .slice(0, 3);
+    // Parse "Reply 1: ...", "Reply 2: ...", "Reply 3: ..." format
+    const lines = raw.split('\n');
+    const suggestions = [];
 
-    if (suggestions.length === 0) {
-        return lang === 'Vietnamese'
-            ? ['Được rồi!', 'Tôi hiểu rồi.', 'Cho tôi biết thêm nhé.']
-            : ['Sounds good!', 'I understand.', 'Tell me more.'];
+    for (const line of lines) {
+        // Strip "Reply N:" prefix nếu có, hoặc lấy thẳng dòng text
+        const cleaned = line
+            .replace(/^Reply\s*\d+\s*:\s*/i, '')
+            .replace(/^[\d.\-*]+\s*/, '')
+            .trim();
+        if (cleaned.length > 0 && cleaned.length < 120) {
+            suggestions.push(cleaned);
+        }
+        if (suggestions.length === 3) break;
+    }
+
+    // Fallback nếu parse không đủ 3
+    const fallbacks = lang === 'Vietnamese'
+        ? ['Được rồi!', 'Tôi hiểu rồi.', 'Cho tôi biết thêm nhé.']
+        : ['Sounds good!', 'Got it, thanks!', 'Tell me more.'];
+
+    while (suggestions.length < 3) {
+        suggestions.push(fallbacks[suggestions.length]);
     }
 
     return suggestions;

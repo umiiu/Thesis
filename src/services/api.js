@@ -135,6 +135,16 @@ export const messageAPI = {
         }
     },
 
+    // ✅ Mới: check unread từ một sender cụ thể
+    getUnreadFromSender: async (senderId) => {
+        try {
+            const response = await api.get(`/messages/unread-from/${senderId}`);
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: 'Failed to fetch unread from sender' };
+        }
+    },
+
     sendMessage: async (messageData) => {
         try {
             const response = await api.post('/messages', messageData);

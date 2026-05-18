@@ -20,21 +20,16 @@ function App() {
   const [showSignUp, setShowSignUp] = useState(false);
   const [user, setUser] = useState(null);
   const [selectedChat, setSelectedChat] = useState(null);
-  const [contacts, setContacts] = useState([]); // Chỉ chứa bạn bè
+  const [contacts, setContacts] = useState([]);
   const [messages, setMessages] = useState({});
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState('messages'); // messages, settings, requests, find
+  const [currentView, setCurrentView] = useState('messages');
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
-  /* ======================
-     SESSION CHECK
-  ====================== */
   useEffect(() => {
-
     checkExistingSession();
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -43,22 +38,14 @@ function App() {
     const savedUser = localStorage.getItem('user');
     const privateKey = getPrivateKey();
 
-    console.log('🔍 Checking session:', {
-      hasToken: !!token,
-      hasUser: !!savedUser,
-      hasPrivateKey: !!privateKey
-    });
-
     if (token && savedUser) {
       try {
         const userData = JSON.parse(savedUser);
         setUser(userData);
         setIsLoggedIn(true);
 
-        // ⚠️ Warning nếu không có private key (đã reload page)
         if (!privateKey) {
-          console.warn('⚠️ Private key not in session - user needs to login again');
-          alert('⚠️ Your encryption key is not available.\n\nFor security, private keys are only stored during your login session.\n\nPlease login again to restore your encryption key and decrypt messages.');
+          alert('⚠️ Your encryption key is not available.\n\nPlease login again to restore your encryption key and decrypt messages.');
         }
 
         await initializeApp(userData);
@@ -71,42 +58,50 @@ function App() {
     setLoading(false);
   };
 
-  /* ======================
-     INIT APP
-  ====================== */
   const initializeApp = async (userData) => {
     try {
       socketService.connect(userData.id);
       socketService.setUserOnline(userData.id);
-
-      await loadFriends(); // ✅ Chỉ load bạn bè
-      await loadPendingRequestsCount(); // ✅ Load số lời mời
+      await loadFriends();
+      await loadPendingRequestsCount();
       setupSocketListeners(userData.id);
     } catch (error) {
       console.error('❌ Error initializing app:', error);
     }
   };
 
-  // ✅ Load danh sách bạn bè (thay vì tất cả users)
+  // ✅ Load friends + check unread từng người
   const loadFriends = async () => {
     try {
       console.log('📥 Loading friends list...');
       const response = await friendAPI.getFriends();
 
       if (response.success) {
-        const list = response.friends.map(f => ({
-          id: f.id,
-          name: f.name,
-          email: f.email,
-          avatar: f.avatar || '👤',
-          status: f.status || 'offline',
-          lastSeen: f.lastSeen,
-          publicKey: f.publicKey,
-          preview: '',
-          time: '',
-          unread: false,
-          typing: false
-        }));
+        const list = await Promise.all(
+          response.friends.map(async (f) => {
+            let hasUnread = false;
+            try {
+              const unreadRes = await messageAPI.getUnreadFromSender(f.id);
+              hasUnread = (unreadRes.unreadCount || 0) > 0;
+            } catch (e) {
+              // không block nếu lỗi
+            }
+
+            return {
+              id: f.id,
+              name: f.name,
+              email: f.email,
+              avatar: f.avatar || '👤',
+              status: f.status || 'offline',
+              lastSeen: f.lastSeen,
+              publicKey: f.publicKey,
+              preview: '',
+              time: '',
+              unread: hasUnread,
+              typing: false
+            };
+          })
+        );
 
         setContacts(list);
         console.log('✅ Loaded', list.length, 'friends');
@@ -116,7 +111,6 @@ function App() {
     }
   };
 
-  // ✅ Load số lượng lời mời kết bạn chờ xử lý
   const loadPendingRequestsCount = async () => {
     try {
       const response = await friendAPI.getPendingCount();
@@ -126,9 +120,6 @@ function App() {
     }
   };
 
-  /* ======================
-     SOCKET LISTENERS
-  ====================== */
   const setupSocketListeners = () => {
     socketService.onUserStatusChange((data) => {
       setOnlineUsers(prev => {
@@ -178,23 +169,35 @@ function App() {
           [data.senderId]: [...(prev[data.senderId] || []), msg]
         }));
 
-        updateContactPreview(data.senderId, text, 'Just now', true);
+        // ✅ Chỉ set unread nếu không đang chat với người đó
+        setSelectedChat(currentChat => {
+          updateContactPreview(
+            data.senderId,
+            text,
+            new Date(data.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            currentChat?.id !== data.senderId // unread = true nếu không đang mở chat đó
+          );
+          return currentChat;
+        });
+
       } catch (error) {
         console.error('❌ Error processing message:', error);
       }
     });
 
     socketService.onMessageSent((data) => {
-      if (!selectedChat) return;
-
-      setMessages(prev => ({
-        ...prev,
-        [selectedChat.id]: prev[selectedChat.id].map(msg =>
-          msg.id === data.tempId
-            ? { ...msg, id: data.messageId, pending: false }
-            : msg
-        )
-      }));
+      setSelectedChat(currentChat => {
+        if (!currentChat) return currentChat;
+        setMessages(prev => ({
+          ...prev,
+          [currentChat.id]: (prev[currentChat.id] || []).map(msg =>
+            msg.id === data.tempId
+              ? { ...msg, id: data.messageId, pending: false }
+              : msg
+          )
+        }));
+        return currentChat;
+      });
     });
 
     socketService.onUserTyping((data) => {
@@ -216,9 +219,6 @@ function App() {
     });
   };
 
-  /* ======================
-     HELPERS
-  ====================== */
   const updateContactPreview = (id, text, time, unread) => {
     setContacts(prev =>
       prev.map(c =>
@@ -227,16 +227,13 @@ function App() {
             ...c,
             preview: text.slice(0, 50),
             time,
-            unread: unread && selectedChat?.id !== id
+            unread: unread
           }
           : c
       )
     );
   };
 
-  /* ======================
-     AUTH
-  ====================== */
   const handleLogin = async (userData) => {
     localStorage.setItem('token', userData.token);
     localStorage.setItem('user', JSON.stringify(userData));
@@ -258,22 +255,22 @@ function App() {
     }
   };
 
-  /* ======================
-     CHAT
-  ====================== */
   const handleSelectChat = async (contact) => {
     console.log('💬 Opening chat with:', contact.name);
     setSelectedChat(contact);
-    setCurrentView('messages'); // ✅ Chuyển về view messages
+    setCurrentView('messages');
 
+    // ✅ Mark as read ngay khi mở chat
     setContacts(prev =>
       prev.map(c => (c.id === contact.id ? { ...c, unread: false } : c))
     );
 
-    if (!user || !user.id) {
-      console.warn('⚠️ User not loaded yet');
-      return;
+    // ✅ Báo server mark conversation as read
+    if (user?.id) {
+      socketService.markConversationAsRead(user.id, contact.id);
     }
+
+    if (!user || !user.id) return;
 
     try {
       console.log('📥 Loading conversation history...');
@@ -283,20 +280,17 @@ function App() {
         const privateKey = getPrivateKey();
 
         if (!privateKey) {
-          console.warn('⚠️ Cannot decrypt - private key not available');
           const encryptedMsgs = response.messages.map(msg => ({
             id: msg._id,
             sender: msg.sender._id,
             senderName: msg.sender.name,
             text: '[Encrypted message - Private key not available]',
             time: new Date(msg.timestamp).toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit'
+              hour: '2-digit', minute: '2-digit'
             }),
             isOwn: msg.sender._id === user.id,
             timestamp: msg.timestamp
           }));
-
           setMessages(prev => ({ ...prev, [contact.id]: encryptedMsgs }));
           return;
         }
@@ -309,7 +303,6 @@ function App() {
 
               if (isOwnMessage) {
                 if (msg.selfEncryptedContent && msg.selfIv && msg.selfEncryptedKey) {
-                  console.log('🔓 Decrypting own message using selfEncrypted version');
                   decryptedText = await decryptMessage(
                     msg.selfEncryptedContent,
                     msg.selfEncryptedKey,
@@ -317,22 +310,19 @@ function App() {
                     privateKey
                   );
                 } else {
-                  console.warn('⚠️ Own message without selfEncrypted');
                   return {
                     id: msg._id,
                     sender: msg.sender._id,
                     senderName: msg.sender.name,
                     text: '[Sent before self-encryption feature]',
                     time: new Date(msg.timestamp).toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit'
+                      hour: '2-digit', minute: '2-digit'
                     }),
                     isOwn: true,
                     timestamp: msg.timestamp
                   };
                 }
               } else {
-                console.log('🔓 Decrypting received message');
                 decryptedText = await decryptMessage(
                   msg.encryptedContent,
                   msg.encryptedKey,
@@ -347,8 +337,7 @@ function App() {
                 senderName: msg.sender.name,
                 text: decryptedText,
                 time: new Date(msg.timestamp).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit'
+                  hour: '2-digit', minute: '2-digit'
                 }),
                 isOwn: isOwnMessage,
                 timestamp: msg.timestamp
@@ -362,8 +351,7 @@ function App() {
                 senderName: msg.sender.name,
                 text: '[Failed to decrypt]',
                 time: new Date(msg.timestamp).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit'
+                  hour: '2-digit', minute: '2-digit'
                 }),
                 isOwn: msg.sender._id === user.id,
                 timestamp: msg.timestamp
@@ -376,7 +364,6 @@ function App() {
         console.log('✅ Loaded', decryptedMsgs.length, 'messages');
 
       } else {
-        console.log('📝 No previous messages');
         setMessages(prev => ({ ...prev, [contact.id]: [] }));
       }
 
@@ -392,8 +379,7 @@ function App() {
       senderName: user.name,
       text: data.originalText,
       time: new Date().toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
+        hour: '2-digit', minute: '2-digit'
       }),
       isOwn: true,
       pending: true,
@@ -405,12 +391,14 @@ function App() {
       [selectedChat.id]: [...(prev[selectedChat.id] || []), msg]
     }));
 
-    updateContactPreview(selectedChat.id, data.originalText, 'Just now', false);
+    updateContactPreview(
+      selectedChat.id,
+      data.originalText,
+      new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      false
+    );
   };
 
-  /* ======================
-     VIEW HANDLERS
-  ====================== */
   const handleShowFindFriends = () => {
     setCurrentView('find');
     setSelectedChat(null);
@@ -430,33 +418,21 @@ function App() {
     setCurrentView('messages');
   };
 
-  // ✅ Callback khi có thay đổi về friends (thêm bạn, chấp nhận lời mời)
   const handleFriendsUpdate = async () => {
     await loadFriends();
     await loadPendingRequestsCount();
   };
 
-  /* ======================
-     RENDER
-  ====================== */
   if (loading) {
     return (
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        flexDirection: 'column',
-        gap: '16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', flexDirection: 'column', gap: '16px',
         background: 'linear-gradient(135deg, #E8ECFF 0%, #C7D7FF 100%)'
       }}>
         <div style={{ fontSize: '48px' }}>🔒</div>
-        <div style={{ fontSize: '24px', fontWeight: 600, color: '#111827' }}>
-          SecureChat
-        </div>
-        <div style={{ fontSize: '14px', color: '#6b7280' }}>
-          Loading...
-        </div>
+        <div style={{ fontSize: '24px', fontWeight: 600, color: '#111827' }}>SecureChat</div>
+        <div style={{ fontSize: '14px', color: '#6b7280' }}>Loading...</div>
       </div>
     );
   }
@@ -489,7 +465,6 @@ function App() {
         pendingRequestsCount={pendingRequestsCount}
       />
 
-      {/* ✅ MAIN CONTENT AREA */}
       {currentView === 'messages' && selectedChat ? (
         <ChatArea
           selectedChat={selectedChat}
@@ -500,8 +475,7 @@ function App() {
           onSendMessage={handleSendMessage}
         />
       ) : currentView === 'settings' ? (
-        <Settings user={user}
-          onUserUpdate={(updatedUser) => setUser(updatedUser)} />
+        <Settings user={user} onUserUpdate={(updatedUser) => setUser(updatedUser)} />
       ) : currentView === 'requests' ? (
         <FriendRequests onUpdate={handleFriendsUpdate} />
       ) : currentView === 'find' ? (
