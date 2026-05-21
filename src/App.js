@@ -73,7 +73,7 @@ function App() {
   // ✅ Load friends + check unread từng người
   const loadFriends = async () => {
     try {
-      console.log('📥 Loading friends list...');
+      console.log(' Loading friends list...');
       const response = await friendAPI.getFriends();
 
       if (response.success) {
@@ -260,12 +260,12 @@ function App() {
     setSelectedChat(contact);
     setCurrentView('messages');
 
-    // ✅ Mark as read ngay khi mở chat
+    // Mark as read ngay khi mở chat
     setContacts(prev =>
       prev.map(c => (c.id === contact.id ? { ...c, unread: false } : c))
     );
 
-    // ✅ Báo server mark conversation as read
+    // Báo server mark conversation as read
     if (user?.id) {
       socketService.markConversationAsRead(user.id, contact.id);
     }
