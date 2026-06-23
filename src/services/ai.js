@@ -1,103 +1,135 @@
+// ==================== GEMINI AI SERVICE ====================
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + GEMINI_API_KEY;
+
+const GEMINI_URL =
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' +
+    GEMINI_API_KEY;
+
+// ==================== CORE API CALL ====================
 
 async function callGemini(prompt, maxTokens) {
-    const tokens = maxTokens || 300;
-    const response = await fetch(GEMINI_URL, {
+    if (!GEMINI_API_KEY) {
+        throw new Error('Gemini API key not configured.');
+    }
+
+    const res = await fetch(GEMINI_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: tokens,
-            }
-        })
+                temperature: 0.5,
+                maxOutputTokens: maxTokens || 512,
+            },
+        }),
     });
 
-    if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error?.message || 'Gemini API error');
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || 'Gemini error ' + res.status);
     }
 
-    const data = await response.json();
+    const data = await res.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 }
 
+// ==================== LANGUAGE DETECTION ====================
+
 function detectLanguage(messages) {
-    const hasVietnameseDiacritics = /[àáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ]/i;
-    const vietnameseWords = /\b(oi|ong|nhe|khong|ranh|duoc|roi|ban|minh|toi|di|vay|sao|gi|nao|den|ve|la|va|thi|ma|hay|nhung|voi|cho|cung|da|se|dang|muon|biet|noi|lam|xem|nghi|nay|kia|day|nua|thoi|xong|chao|cam|on)\b/i;
-    const allText = messages.map(function (m) { return m.text; }).join(' ');
-    if (hasVietnameseDiacritics.test(allText)) return 'Vietnamese';
-    if (vietnameseWords.test(allText)) return 'Vietnamese';
+    const allText = messages.map((m) => m.text).join(' ');
+    const vietDiacritics =
+        /[àáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ]/i;
+    const vietWords =
+        /\b(oi|nhe|khong|duoc|roi|ban|minh|toi|vay|sao|nao|thoi|xong|chao|cam)\b/i;
+    if (vietDiacritics.test(allText)) return 'Vietnamese';
+    if (vietWords.test(allText)) return 'Vietnamese';
     return 'English';
 }
+
+// ==================== PARSE 3 REPLIES ====================
+
+function extractThreeReplies(raw, fallbacks) {
+    console.log('[AI] raw output:', JSON.stringify(raw));
+
+    const cleaned = raw.replace(/```[\w]*\n?/g, '').replace(/```/g, '').trim();
+
+    // Match lines starting with 1. 2. 3. (or 1) 2) 3))
+    const results = [];
+    for (const line of cleaned.split('\n')) {
+        const m = line.match(/^\s*([123])[.)]\s*(.+)$/);
+        if (m) {
+            const num = parseInt(m[1]);
+            results[num - 1] = m[2].trim();
+        }
+    }
+
+    // Fill slots that are still empty
+    for (let i = 0; i < 3; i++) {
+        if (!results[i]) results[i] = fallbacks[i];
+    }
+
+    console.log('[AI] final replies:', results.slice(0, 3));
+    return results.slice(0, 3);
+}
+
+// ==================== CHECK AI STATUS ====================
 
 export async function checkAIStatus() {
     return { available: !!GEMINI_API_KEY };
 }
 
-export async function generateSmartReplies(messages) {
-    const recentMessages = messages.slice(-5)
-        .map(function (m) { return (m.isOwn ? 'Me' : 'Friend') + ': ' + m.text; })
-        .join('\n');
+// ==================== SMART REPLY ====================
 
+export async function generateSmartReplies(messages) {
     const lang = detectLanguage(messages);
 
-    const prompt = 'You are a chat assistant. Based on this conversation, generate exactly 3 short reply suggestions for "Me".\n\n'
-        + 'Conversation:\n'
-        + recentMessages
-        + '\n\nRules:\n'
-        + '- Output ONLY 3 lines, one reply per line\n'
-        + '- Use ' + lang + ' language\n'
-        + '- Each reply must be under 15 words\n'
-        + '- No numbering, no bullets, no extra text\n'
-        + '- Make each reply different in tone\n\n'
-        + 'Reply 1:\nReply 2:\nReply 3:';
+    const fallbacks =
+        lang === 'Vietnamese'
+            ? ['Được rồi!', 'Ok bạn ơi!', 'Ừ, mình hiểu rồi!']
+            : ['Sounds good!', 'Got it!', 'Sure, no problem!'];
 
-    const raw = await callGemini(prompt, 150);  // ← tăng lên 150
+    const ctx = messages
+        .slice(-4)
+        .map((m) => (m.isOwn ? 'Me' : 'Friend') + ': ' + m.text)
+        .join('\n');
 
-    // Parse "Reply 1: ...", "Reply 2: ...", "Reply 3: ..." format
-    const lines = raw.split('\n');
-    const suggestions = [];
+    const prompt =
+        'Given this chat conversation, write 3 reply options for "Me" in ' + lang + '.\n' +
+        'Each reply must be short (under 10 words) and on its own numbered line.\n' +
+        'Respond with exactly these 3 lines and nothing else:\n' +
+        '1. <reply here>\n' +
+        '2. <reply here>\n' +
+        '3. <reply here>\n\n' +
+        'Conversation:\n' + ctx;
 
-    for (const line of lines) {
-        // Strip "Reply N:" prefix nếu có, hoặc lấy thẳng dòng text
-        const cleaned = line
-            .replace(/^Reply\s*\d+\s*:\s*/i, '')
-            .replace(/^[\d.\-*]+\s*/, '')
-            .trim();
-        if (cleaned.length > 0 && cleaned.length < 120) {
-            suggestions.push(cleaned);
-        }
-        if (suggestions.length === 3) break;
+    try {
+        const raw = await callGemini(prompt, 500);
+        return extractThreeReplies(raw, fallbacks);
+    } catch (err) {
+        console.error('[AI] generateSmartReplies error:', err);
+        return fallbacks;
     }
-
-    // Fallback nếu parse không đủ 3
-    const fallbacks = lang === 'Vietnamese'
-        ? ['Được rồi!', 'Tôi hiểu rồi.', 'Cho tôi biết thêm nhé.']
-        : ['Sounds good!', 'Got it, thanks!', 'Tell me more.'];
-
-    while (suggestions.length < 3) {
-        suggestions.push(fallbacks[suggestions.length]);
-    }
-
-    return suggestions;
 }
 
-export async function summarizeConversation(messages) {
-    const context = messages
-        .map(function (m) { return (m.isOwn ? 'Me' : 'Friend') + ': ' + m.text; })
-        .join('\n');
+// ==================== CONVERSATION SUMMARY ====================
 
+export async function summarizeConversation(messages) {
     const lang = detectLanguage(messages);
 
-    const prompt = 'Summarize this chat conversation in 2-3 complete sentences in ' + lang + '.\n'
-        + 'Focus on: main topics discussed, decisions made, action items.\n'
-        + 'Be concise and natural. Write complete sentences only.\n\n'
-        + 'Conversation:\n'
-        + context
-        + '\n\nSummary:';
+    const ctx = messages
+        .map((m) => (m.isOwn ? 'Me' : 'Friend') + ': ' + m.text)
+        .join('\n');
 
-    return await callGemini(prompt, 500);
+    const prompt =
+        'Summarize this chat in 2-3 sentences in ' + lang + '. No bullet points.\n\n' +
+        ctx + '\n\nSummary:';
+
+    try {
+        return await callGemini(prompt, 500);
+    } catch (err) {
+        console.error('[AI] summarizeConversation error:', err);
+        return lang === 'Vietnamese'
+            ? 'Không thể tạo tóm tắt. Vui lòng thử lại.'
+            : 'Unable to generate summary. Please try again.';
+    }
 }
